@@ -1,0 +1,198 @@
+# claude-autoyes
+
+Auto-approve the routine **"Do you want to proceed?"** prompts in Claude Code — while destructive commands still stop and ask you.
+
+```
+$ claude-autoyes explain Bash "git status --short"
+
+  Bash git status --short
+  ALLOW (no prompt)
+  matched autoApprove rule Bash(git status*)
+
+$ claude-autoyes explain Bash "git status && rm -rf ~/projects"
+
+  Bash git status && rm -rf ~/projects
+  ASK  (prompt shown)
+  built-in guard "recursive-delete": recursive delete
+```
+
+## Why not just `--dangerously-skip-permissions`?
+
+Because that flag is all-or-nothing. `rm -rf`, `git push --force`, `curl … | sh` and a write to `~/.ssh/config` are approved just as silently as `ls`.
+
+`claude-autoyes` sits in between:
+
+| | prompts for `ls` | prompts for `rm -rf ~` | audit log |
+|---|---|---|---|
+| default Claude Code | yes | yes | no |
+| `--dangerously-skip-permissions` | no | **no** | no |
+| **claude-autoyes** | no | **yes** | yes |
+
+It runs as a [`PreToolUse` hook](https://docs.claude.com/en/docs/claude-code/hooks), so it decides *before* the prompt would appear. It never denies anything — the worst it does is let the normal prompt through.
+
+## Install
+
+```bash
+npm install -g claude-autoyes
+claude-autoyes install
+```
+
+Then restart Claude Code (or open `/hooks` once) so the hook is picked up.
+
+To run from a clone instead:
+
+```bash
+git clone https://github.com/gyetiskin/claude-autoyes.git
+cd claude-autoyes && node bin/cli.js install
+```
+
+## How the decision is made
+
+Each pending tool call runs through five checks, in order. The first one that matches wins:
+
+1. **Off switch** — `enabled: false` or `mode: "off"` → prompt as usual.
+2. **Terminal** — not in `terminals` → prompt as usual. Fails closed: an unidentifiable terminal never auto-approves.
+3. **Built-in guards** — destructive or irreversible → prompt as usual. Guards beat every rule you can write.
+4. **`alwaysAsk` rules** → prompt as usual.
+5. **`autoApprove` rules** → approved, no prompt.
+
+Anything reaching the end is decided by `mode`: `safe` prompts, `aggressive` approves.
+
+### Command chains are split first
+
+A rule like `Bash(git status*)` would otherwise approve `git status && rm -rf ~`, since the whole line still starts with `git status`. So command lines are split on `&&`, `||`, `;`, `|` and newlines (respecting quotes), and:
+
+- **approving requires *every* segment to match a rule** — different segments may match different rules, so `git add . && git status` is fine;
+- **asking requires only *one* segment to match** a guard or an `alwaysAsk` rule.
+
+Leading `FOO=1` assignments and `env`/`command`/`nohup`/`time`/`exec` wrappers are stripped before matching, so `env X=1 sudo rm -rf /` cannot hide behind them.
+
+## Why iTerm2?
+
+The gate exists so auto-approval is scoped to the terminal where *you* are sitting and watching. A cron job, a CI runner, or an SSH session inherits a different `TERM_PROGRAM` and keeps prompting.
+
+If you want it everywhere, opt in explicitly:
+
+```jsonc
+{ "terminals": ["*"] }              // any terminal
+{ "terminals": ["iTerm.app", "Ghostty", "WezTerm"] }
+```
+
+Detection reads `LC_TERMINAL` first, then `TERM_PROGRAM`, because iTerm2 forwards `LC_TERMINAL` over SSH.
+
+## Configuration
+
+`~/.claude/autoyes.json` — created on install, safe to edit by hand. A malformed file falls back to the built-in defaults rather than breaking your session.
+
+```jsonc
+{
+  "enabled": true,
+  "mode": "safe",                    // safe | aggressive | off
+  "terminals": ["iTerm.app"],
+  "log": true,
+  "logPath": "~/.claude/autoyes.log",
+
+  "autoApprove": ["Read", "Grep", "Bash(git status*)", "Bash(npm run *)"],
+  "alwaysAsk":   ["Bash(git push*)", "Bash(git commit*)"],
+
+  "unsafeDisableBuiltinGuards": false
+}
+```
+
+`autoApprove`, `alwaysAsk` and `terminals` **replace** the defaults when you set them. To add to the defaults instead, use `extendAutoApprove` / `extendAlwaysAsk`.
+
+### Rule syntax
+
+Identical to Claude Code's own permission rules:
+
+| Rule | Matches |
+|---|---|
+| `Read` | every `Read` call |
+| `Bash(git status*)` | `Bash` whose command matches the glob |
+| `Edit(src/*)` | `Edit` whose `file_path` matches |
+| `WebFetch(https://docs.*)` | `WebFetch` whose URL matches |
+| `*` | any tool |
+
+`*` matches any run of characters, `?` matches one, everything else is literal.
+
+### Modes
+
+| Mode | Unmatched call |
+|---|---|
+| `safe` *(default)* | prompts — you opt in rule by rule |
+| `aggressive` | approved — you opt *out* via guards and `alwaysAsk` |
+| `off` | nothing is auto-approved |
+
+`aggressive` still honours every guard. It suits throwaway repos, not your production checkout.
+
+## Built-in guards
+
+These always fall through to a prompt, whatever your rules say. Run `claude-autoyes guards` for the live list.
+
+`recursive-delete` · `force-delete` · `privilege-escalation` · `pipe-to-shell` · `pipe-to-interpreter` · `force-push` · `history-rewrite` · `branch-delete` · `disk-write` · `permission-change` · `ownership-change` · `fork-bomb` · `process-kill` · `system-power` · `publish` · `infra-apply` · `credential-read` · `history-clear` · `protected-path`
+
+`git push --force` is guarded; `git push --force-with-lease` is not.
+
+Guards can be switched off with `unsafeDisableBuiltinGuards: true`. At that point you have rebuilt `--dangerously-skip-permissions` with extra steps, so please don't.
+
+## Commands
+
+```
+claude-autoyes install            Register the hook in ~/.claude/settings.json
+claude-autoyes uninstall          Remove the hook (config is kept)
+claude-autoyes status             Installation, terminal and config state
+claude-autoyes doctor             Diagnose why prompts are/aren't auto-approved
+claude-autoyes on | off           Toggle without uninstalling
+claude-autoyes mode safe          safe | aggressive | off
+claude-autoyes explain <tool> [subject]
+                                  Dry-run one call and print the decision
+claude-autoyes allow '<rule>'     Append to autoApprove
+claude-autoyes ask '<rule>'       Append to alwaysAsk
+claude-autoyes rules              List active rules
+claude-autoyes guards             List built-in guards
+claude-autoyes log [n]            Last n decisions
+claude-autoyes config             Print the resolved config
+```
+
+`explain` runs the exact code path the hook runs, so it is the fastest way to test a rule before trusting it.
+
+## Audit log
+
+Auto-approval is only trustworthy if you can check what happened. Every decision — approved *and* prompted — is appended to `~/.claude/autoyes.log` as one JSON line:
+
+```json
+{"at":"2026-08-04T09:14:02.001Z","session":"a1b2","tool":"Bash","subject":"git status --short","decision":"allow","reason":"matched autoApprove rule Bash(git status*)"}
+```
+
+```bash
+claude-autoyes log 50
+```
+
+Set `"log": false` to turn it off.
+
+## Safety design
+
+- **Never denies.** The hook emits `allow` or nothing at all. It cannot block a tool call.
+- **Fails closed.** Bad JSON on stdin, a corrupt config, an unknown terminal, an unexpected exception — all end in "emit nothing, exit 0", which just shows you the normal prompt.
+- **Guards outrank rules.** No `autoApprove` entry and no `aggressive` mode can override a guard.
+- **Backs up settings.** `install` and `uninstall` copy `settings.json` to `settings.json.autoyes-backup` first, and merge into your existing hooks rather than replacing them.
+- **Fast.** ~30 ms per call, no dependencies.
+
+## Uninstall
+
+```bash
+claude-autoyes uninstall     # removes the hook, leaves other hooks untouched
+rm ~/.claude/autoyes.json    # optional
+```
+
+## Development
+
+```bash
+npm test        # 35 tests, node:test, no dependencies
+```
+
+`src/decide.js` is a pure function over `{ toolName, toolInput, config, env }`, so the whole policy is testable without touching the filesystem.
+
+## License
+
+MIT

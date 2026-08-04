@@ -1,0 +1,44 @@
+{
+  "name": "claude-autoyes",
+  "version": "0.1.0",
+  "description": "Auto-approve routine Claude Code permission prompts in iTerm2, while destructive commands still stop and ask.",
+  "type": "module",
+  "license": "MIT",
+  "author": "gyetiskin",
+  "homepage": "https://github.com/gyetiskin/claude-autoyes#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gyetiskin/claude-autoyes.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gyetiskin/claude-autoyes/issues"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "iterm2",
+    "hooks",
+    "permissions",
+    "cli",
+    "automation"
+  ],
+  "bin": {
+    "claude-autoyes": "bin/cli.js"
+  },
+  "exports": {
+    ".": "./src/decide.js",
+    "./hook": "./src/hook.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/"
+  }
+}
