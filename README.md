@@ -188,7 +188,7 @@ rm ~/.claude/autoyes.json    # optional
 ## Development
 
 ```bash
-npm test        # 35 tests, node:test, no dependencies
+npm test        # 37 tests, node:test, no dependencies
 ```
 
 `src/decide.js` is a pure function over `{ toolName, toolInput, config, env }`, so the whole policy is testable without touching the filesystem.

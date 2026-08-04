@@ -9,7 +9,27 @@ export const HOOK_PATH = join(dirname(fileURLToPath(import.meta.url)), 'hook.js'
 /** Identifies our hook entry across upgrades, even if the path changes. */
 export const HOOK_MARKER = 'claude-autoyes'
 
-export function hookCommand(nodePath = process.execPath, hookPath = HOOK_PATH) {
+/**
+ * Paths that embed a version number and therefore die on the next upgrade.
+ * `process.execPath` under Homebrew is `/opt/homebrew/Cellar/node/26.5.1/…`,
+ * which stops existing the moment `brew upgrade node` runs — and a hook
+ * pointing at a missing binary is a hook that silently never fires.
+ */
+const VOLATILE_NODE_PATH = /\/(Cellar|versions|\.nvm|\.fnm|\.volta|\.asdf)\//i
+
+const STABLE_NODE_PATHS = ['/opt/homebrew/bin/node', '/usr/local/bin/node', '/usr/bin/node']
+
+/**
+ * Prefers a version-stable node path, falling back to a bare `node` resolved
+ * from PATH. If that also fails at runtime the hook simply produces no output,
+ * which shows the normal prompt.
+ */
+export function resolveNodePath(execPath = process.execPath) {
+  if (!VOLATILE_NODE_PATH.test(execPath)) return execPath
+  return STABLE_NODE_PATHS.find((candidate) => existsSync(candidate)) ?? 'node'
+}
+
+export function hookCommand(nodePath = resolveNodePath(), hookPath = HOOK_PATH) {
   return `"${nodePath}" "${hookPath}"`
 }
 

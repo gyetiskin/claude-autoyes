@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { addHook, isInstalled, removeHook } from '../src/installer.js'
+import { addHook, isInstalled, removeHook, resolveNodePath } from '../src/installer.js'
 import { splitCommand, normalizeSegment } from '../src/shell.js'
 import { globToRegExp, matchRule, parseRule } from '../src/rules.js'
 
@@ -46,6 +46,22 @@ test('uninstall leaves foreign hooks and drops empty scaffolding', () => {
 
 test('uninstall on a clean file is a no-op', () => {
   assert.equal(removeHook({ theme: 'dark' }).action, 'not-found')
+})
+
+test('a version-pinned node path is never baked into the hook command', () => {
+  for (const volatile of [
+    '/opt/homebrew/Cellar/node/26.5.1/bin/node',
+    '/Users/me/.nvm/versions/node/v20.11.0/bin/node',
+    '/Users/me/.volta/tools/image/node/22.0.0/bin/node',
+  ]) {
+    const resolved = resolveNodePath(volatile)
+    assert.notEqual(resolved, volatile)
+    assert.ok(resolved === 'node' || !/\d+\.\d+\.\d+/.test(resolved), `still version-pinned: ${resolved}`)
+  }
+})
+
+test('an already-stable node path is left alone', () => {
+  assert.equal(resolveNodePath('/usr/bin/node'), '/usr/bin/node')
 })
 
 test('splitCommand respects quotes and escapes', () => {
