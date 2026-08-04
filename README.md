@@ -123,12 +123,15 @@ Identical to Claude Code's own permission rules:
 
 A trailing `" *"` means "arguments", and arguments are optional: `Bash(sort *)` covers both `sort -u file` and the bare `sort` in `… | sort | uniq -c`. Write rules this way rather than as `Bash(sort*)` — the latter would also match `sortfoo`, which is how an `ls*` rule ends up approving `lsof`.
 
-### File edits are not auto-approved
+### File edits
 
-`Edit`, `Write` and `NotebookEdit` are deliberately absent from the defaults: changing your files is the one thing worth glancing at. Claude Code's own `acceptEdits` mode already covers that case. If you still want it, scope it to a directory rather than turning it on globally:
+`Edit`, `Write` and `NotebookEdit` are auto-approved, because the protected-path guard already covers what actually matters: credentials, git hooks, and the settings files that decide what gets auto-approved in the first place. A tool that can silently rewrite its own permission rules is not one you could audit, so those edits always surface a prompt.
+
+To review every edit instead, narrow the rule to the directories you trust:
 
 ```bash
-claude-autoyes allow 'Edit(/Users/me/projects/scratch/*)'
+claude-autoyes ask 'Edit'                            # back to prompting for all edits
+claude-autoyes allow 'Edit(/Users/me/projects/*)'    # or scope it
 ```
 
 ### Modes

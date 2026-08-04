@@ -58,8 +58,24 @@ export const COMMAND_GUARDS = [
 /** Every guard, for display purposes. */
 export const ALL_GUARDS = [...COMMAND_GUARDS, ...BASH_GUARDS]
 
-/** Paths that must never be silently written to. */
-export const PROTECTED_PATH = /(^|\/)\.(env|git\/config|ssh|aws|npmrc|netrc|gnupg)(\/|$)|(^|\/)(id_rsa|id_ed25519|credentials)$|^\/(etc|usr|bin|sbin|System|Library)\//
+/**
+ * Paths that must never be silently written to.
+ *
+ * Includes the files that decide what gets auto-approved — Claude Code's
+ * settings, this tool's own config, and anything that executes on its own
+ * (git hooks). A tool that can silently rewrite its own permission rules is
+ * not one you can audit, so those edits always surface a prompt.
+ */
+export const PROTECTED_PATH = new RegExp(
+  [
+    String.raw`(^|/)\.(env|ssh|aws|npmrc|netrc|gnupg)(/|$)`,
+    String.raw`(^|/)\.git/(config|hooks/)`,
+    String.raw`(^|/)\.claude/settings(\.local)?\.json$`,
+    String.raw`(^|/)autoyes\.json$`,
+    String.raw`(^|/)(id_rsa|id_ed25519|credentials)$`,
+    String.raw`^/(etc|usr|bin|sbin|System|Library)/`,
+  ].join('|'),
+)
 
 /**
  * @param {string} toolName

@@ -76,7 +76,6 @@ export const DEFAULT_CONFIG = {
     'Bash(cut *)',
     'Bash(tr *)',
     'Bash(nl *)',
-    'Bash(sed -n *)',
     'Bash(sleep *)',
     'Bash(export *)',
     'Bash(jq *)',
@@ -139,6 +138,17 @@ export const DEFAULT_CONFIG = {
     'Bash(prettier *)',
     'Bash(tsc *)',
     'Bash(mkdir -p *)',
+    'Bash(touch *)',
+    'Bash(cp *)',
+    'Bash(sed *)',
+
+    // File edits. Opted in deliberately: the protected-path guard still stops
+    // writes to credentials, git hooks and the settings files that decide what
+    // gets auto-approved in the first place.
+    'Edit',
+    'MultiEdit',
+    'Write',
+    'NotebookEdit',
   ],
 
   // Matched before autoApprove: these always fall through to the normal prompt.
