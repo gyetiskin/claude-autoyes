@@ -34,6 +34,9 @@ export const BASH_GUARDS = [
   { id: 'system-power', why: 'shuts the machine down', test: /\b(shutdown|reboot|halt)\b/ },
   { id: 'publish', why: 'publishes a release publicly', test: /\b(npm|pnpm|yarn)\s+publish\b|\btwine\s+upload\b|\bcargo\s+publish\b|\bgem\s+push\b/ },
   { id: 'infra-apply', why: 'mutates live infrastructure', test: /\b(terraform\s+(apply|destroy)|kubectl\s+delete|helm\s+(delete|uninstall)|aws\s+\S+\s+delete)/ },
+  // `gh api` is a read by default, so it is approved — but the same command
+  // writes to GitHub once a method or a field is supplied.
+  { id: 'api-write', why: 'writes through the GitHub API', test: /\bgh\s+api\b[\s\S]*(-X\s+(POST|PUT|PATCH|DELETE)\b|--method[= ](POST|PUT|PATCH|DELETE)\b|\s(-f|-F|--field|--raw-field)[= ])/i },
   { id: 'credential-read', why: 'reads credentials', test: /(~|\$HOME)?\/?\.(ssh|aws|gnupg)\/|\bsecurity\s+find-(generic|internet)-password\b|\.env(\.|\s|$)/ },
   { id: 'history-clear', why: 'erases shell history', test: /\bhistory\s+-c\b|>\s*~?\/?\.(bash|zsh)_history/ },
 ]

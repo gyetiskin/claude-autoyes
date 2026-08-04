@@ -73,6 +73,19 @@ test('a targeted delete is routine but a wildcard delete is not', () => {
   assert.equal(run('Bash', { command: 'rm -f ~' }).guard, 'root-delete')
 })
 
+test('gh api reads are routine but writes are guarded', () => {
+  assert.equal(run('Bash', { command: "gh api repos/o/r --jq '.stargazers_count'" }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'gh api repos/o/r -X DELETE' }).guard, 'api-write')
+  assert.equal(run('Bash', { command: 'gh api repos/o/r/issues -f title=bug' }).guard, 'api-write')
+  assert.equal(run('Bash', { command: 'gh api --method PATCH repos/o/r' }).guard, 'api-write')
+})
+
+test('running a local script is allowed, but its guarded content is not', () => {
+  assert.equal(run('Bash', { command: 'bash test/checks.sh' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'php test/apple.php' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'bash -c "sudo apt-get install evil"' }).guard, 'privilege-escalation')
+})
+
 test('pushing is routine but rewriting remote history is not', () => {
   assert.equal(run('Bash', { command: 'git push -q origin HEAD' }).decision, 'allow')
   assert.equal(run('Bash', { command: 'git push --force origin main' }).guard, 'force-push')

@@ -70,6 +70,7 @@ Before matching, each segment is reduced to the command it actually runs:
 - leading `FOO=1` assignments and `env`/`command`/`nohup`/`time`/`exec` wrappers are stripped, so `env X=1 sudo rm -rf /` cannot hide behind them;
 - shell keywords and grouping (`if`, `then`, `do`, `{`, `(`, …) are stripped. This is not cosmetic: `if sudo rm -rf /; then` produces a segment beginning with `if`, and the privilege-escalation guard is anchored at `^sudo`, so without it the guard would never fire;
 - git's global options are folded away, so `git -C /repo commit` and `git -c user.name=x commit` still meet the `Bash(git commit*)` rule instead of slipping past it;
+- `sh -c "…"` script arguments are unpacked and checked, so approving `bash *` does not become a way to run anything;
 - `$( … )` and backtick substitutions are pulled out and checked as commands in their own right. Skipping them was a guard bypass: `sudo apt-get install x` is caught, but `echo $(sudo apt-get install x)` used to be approved by the `echo` rule alone;
 - heredoc bodies are masked. `cat > f <<'EOF' … EOF` is data, not commands — otherwise a file whose contents mention `sort` would be matched as if the shell were running `sort`.
 
@@ -148,7 +149,7 @@ claude-autoyes allow 'Edit(/Users/me/projects/*)'    # or scope it
 
 These always fall through to a prompt, whatever your rules say. Run `claude-autoyes guards` for the live list.
 
-`recursive-delete` · `mass-delete` · `root-delete` · `privilege-escalation` · `pipe-to-shell` · `pipe-to-interpreter` · `force-push` · `history-rewrite` · `branch-delete` · `disk-write` · `permission-change` · `ownership-change` · `fork-bomb` · `process-kill` · `system-power` · `publish` · `infra-apply` · `credential-read` · `history-clear` · `protected-path`
+`recursive-delete` · `mass-delete` · `root-delete` · `privilege-escalation` · `pipe-to-shell` · `pipe-to-interpreter` · `force-push` · `history-rewrite` · `branch-delete` · `disk-write` · `permission-change` · `ownership-change` · `fork-bomb` · `process-kill` · `system-power` · `publish` · `infra-apply` · `api-write` · `credential-read` · `history-clear` · `protected-path`
 
 The guards draw the line at *scope*, not at the command name: `rm -f build.zip` is routine cleanup and is approved, while `rm -f *.zip` deletes an unknown number of files and prompts. Likewise `git push` is approved but `git push --force` is guarded, and `git push --force-with-lease` is not.
 
@@ -210,7 +211,7 @@ rm ~/.claude/autoyes.json    # optional
 ## Development
 
 ```bash
-npm test        # 52 tests, node:test, no dependencies
+npm test        # 54 tests, node:test, no dependencies
 ```
 
 `src/decide.js` is a pure function over `{ toolName, toolInput, config, env }`, so the whole policy is testable without touching the filesystem.
