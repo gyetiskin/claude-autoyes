@@ -209,3 +209,12 @@ test('force push is guarded but --force-with-lease is not', () => {
   assert.equal(run('Bash', { command: 'git push --force origin main' }, { mode: 'aggressive' }).guard, 'force-push')
   assert.equal(run('Bash', { command: 'git push --force-with-lease origin main' }, { mode: 'aggressive' }).guard, undefined)
 })
+
+test('reading git config is routine but writing it is guarded', () => {
+  assert.equal(run('Bash', { command: 'git config --local user.email' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'git config --get user.name' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'git config --list' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'git config --local user.email a@b.c' }).guard, 'config-write')
+  assert.equal(run('Bash', { command: 'git config --global --unset user.name' }).guard, 'config-write')
+  assert.equal(run('Bash', { command: 'git config core.hooksPath /tmp/evil' }).guard, 'config-write')
+})

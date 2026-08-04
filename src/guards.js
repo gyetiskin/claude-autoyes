@@ -39,6 +39,13 @@ export const BASH_GUARDS = [
   { id: 'api-write', why: 'writes through the GitHub API', test: /\bgh\s+api\b[\s\S]*(-X\s+(POST|PUT|PATCH|DELETE)\b|--method[= ](POST|PUT|PATCH|DELETE)\b|\s(-f|-F|--field|--raw-field)[= ])/i },
   { id: 'credential-read', why: 'reads credentials', test: /(~|\$HOME)?\/?\.(ssh|aws|gnupg)\/|\bsecurity\s+find-(generic|internet)-password\b|\.env(\.|\s|$)/ },
   { id: 'history-clear', why: 'erases shell history', test: /\bhistory\s+-c\b|>\s*~?\/?\.(bash|zsh)_history/ },
+  // `git config user.email` reads; `git config user.email x@y` writes. The
+  // difference is one trailing argument, so the guard is what separates them.
+  {
+    id: 'config-write',
+    why: 'changes git configuration',
+    test: /\bgit\s+config\s+(?:--(?:local|global|system|worktree)\s+|--file\s+\S+\s+)*(?:--(?:unset|unset-all|add|replace-all|edit|remove-section|rename-section)\b|[\w][\w.-]*\s+\S)/,
+  },
 ]
 
 /**
