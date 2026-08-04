@@ -60,12 +60,11 @@ export const COMMAND_GUARDS = [
   {
     id: 'pipe-to-shell',
     why: 'executes downloaded code',
-    test: /\b(curl|wget|fetch)\b[\s\S]*\|\s*(sudo\s+|xargs\s+)?(ba|z|k|da)?sh\b/,
-  },
-  {
-    id: 'pipe-to-interpreter',
-    why: 'pipes downloaded code into an interpreter',
-    test: /\b(curl|wget|fetch)\b[\s\S]*\|\s*(sudo\s+)?(python3?|perl|ruby|node)\b/,
+    // The danger is an interpreter reading its *program* from the pipe, as in
+    // `curl … | sh`. With `-c` the program is written out in the command and
+    // the pipe carries only data, which is an ordinary way to format a JSON
+    // response — guarding that just trains you to click through prompts.
+    test: /\b(curl|wget|fetch)\b[\s\S]*\|\s*(?:sudo\s+|xargs\s+)?(?:(?:ba|z|k|da)?sh|python3?|perl|ruby|node)\b(?![^|;&\n]*\s-c\b)/,
   },
 ]
 

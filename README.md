@@ -149,7 +149,7 @@ claude-autoyes allow 'Edit(/Users/me/projects/*)'    # or scope it
 
 These always fall through to a prompt, whatever your rules say. Run `claude-autoyes guards` for the live list.
 
-`recursive-delete` · `mass-delete` · `root-delete` · `privilege-escalation` · `pipe-to-shell` · `pipe-to-interpreter` · `force-push` · `history-rewrite` · `branch-delete` · `disk-write` · `permission-change` · `ownership-change` · `fork-bomb` · `process-kill` · `system-power` · `publish` · `infra-apply` · `api-write` · `config-write` · `credential-read` · `history-clear` · `protected-path`
+`recursive-delete` · `mass-delete` · `root-delete` · `privilege-escalation` · `pipe-to-shell` · `force-push` · `history-rewrite` · `branch-delete` · `disk-write` · `permission-change` · `ownership-change` · `fork-bomb` · `process-kill` · `system-power` · `publish` · `infra-apply` · `api-write` · `config-write` · `credential-read` · `history-clear` · `protected-path`
 
 The guards draw the line at *scope*, not at the command name: `rm -f build.zip` is routine cleanup and is approved, while `rm -f *.zip` deletes an unknown number of files and prompts. Likewise `git push` is approved but `git push --force` is guarded, and `git push --force-with-lease` is not.
 
