@@ -42,7 +42,7 @@ test('guards beat both aggressive mode and an explicit allow rule', () => {
 test('a chained destructive command cannot ride along with a safe prefix', () => {
   const result = run('Bash', { command: 'git status && rm -rf /' })
   assert.equal(result.decision, 'ask')
-  assert.equal(result.guard, 'recursive-delete')
+  assert.equal(result.guard, 'root-delete')
 })
 
 test('a chained unmatched command is not approved by the safe prefix rule', () => {
@@ -73,8 +73,30 @@ test('a targeted delete is routine but a wildcard delete is not', () => {
   // A literal prefix names a deliberate family of files, not a sweep.
   assert.equal(run('Bash', { command: 'rm -f $D/fresh*.db*' }).decision, 'allow')
   assert.equal(run('Bash', { command: 'rm -f /tmp/build-*.log' }).decision, 'allow')
-  assert.equal(run('Bash', { command: 'rm -rf /tmp/dir' }).guard, 'recursive-delete')
   assert.equal(run('Bash', { command: 'rm -f ~' }).guard, 'root-delete')
+})
+
+test('a recursive delete is judged by what it deletes', () => {
+  // Scratch and regenerable build output cost nothing to lose.
+  assert.equal(run('Bash', { command: 'rm -rf /tmp/dir' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'rm -rf node_modules' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'rm -rf ./dist' }).decision, 'allow')
+  // Anything else, including a path the guard cannot resolve, still prompts.
+  assert.equal(run('Bash', { command: 'rm -rf $D' }).guard, 'recursive-delete')
+  assert.equal(run('Bash', { command: 'rm -rf ~/projects' }).guard, 'recursive-delete')
+  assert.equal(run('Bash', { command: 'rm -rf src' }).guard, 'recursive-delete')
+})
+
+test('an assignment earlier in the line lets the guard see the real path', () => {
+  assert.equal(run('Bash', { command: 'D=/private/tmp/scratch/x\nrm -rf $D' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'D=/Users/me/work\nrm -rf $D' }).guard, 'recursive-delete')
+  // Resolution cuts both ways.
+  assert.equal(run('Bash', { command: 'D=/\nrm -rf $D' }).guard, 'root-delete')
+})
+
+test('a delete reached through another command is still judged', () => {
+  assert.equal(run('Bash', { command: 'find . -name x -exec rm -rf {} \\;' }).guard, 'recursive-delete')
+  assert.equal(run('Bash', { command: 'git ls-files | xargs rm -rf' }).guard, 'recursive-delete')
 })
 
 test('gh api reads are routine but writes are guarded', () => {

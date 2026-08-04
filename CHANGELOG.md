@@ -2,6 +2,11 @@
 
 Every entry below came from watching the audit log of real sessions rather than from reasoning about what might go wrong. The pattern repeated: a rule that looked safe on paper approved something it should not have, or prompted on something routine until the prompts stopped being read.
 
+## 0.11.0
+
+- Resolve literal variable assignments before matching. `D=/private/tmp/…/cleanci` followed by `rm -rf $D` used to reach the guard as an opaque `$D`, which it had to assume the worst about. It now sees the real path — and so does `D=/ ; rm -rf $D`, which is newly caught.
+- Judge `rm` by its targets rather than by its flags. Scratch space and regenerable build output are approved; every other path prompts, including one that stays unresolved. `rm` is now also found mid-segment, so `find … -exec rm -rf {} \;` and `… | xargs rm -rf` are judged rather than missed — the xargs form has no targets on the line at all, so its set is unbounded and it always prompts.
+
 ## 0.10.0
 
 - Draw `mass-delete` at the right place. It fired on `rm -f $D/fresh*.db*`, which names a deliberate family of files; the shape that actually sweeps whatever is present is a *filename* starting with a wildcard — `rm -f *.zip`, `rm -f build/*`, `rm -f *`. Those still prompt.

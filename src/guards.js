@@ -9,20 +9,13 @@
  * `unsafeDisableBuiltinGuards: true`, which the CLI warns loudly about.
  */
 
-import { splitCommand, normalizeSegment } from './shell.js'
+import { splitCommand, normalizeSegment, resolveAssignments } from './shell.js'
 
 /**
  * Guards evaluated against a single command segment.
  * @type {{id: string, why: string, test: RegExp}[]}
  */
 export const BASH_GUARDS = [
-  { id: 'recursive-delete', why: 'recursive delete', test: /\brm\s+(-\w*[rR]\w*\s+)*-\w*[rR]/ },
-  // The line is whether the *filename* starts with a wildcard. `rm -f *.zip`
-  // and `rm -f build/*` sweep whatever happens to be there; `rm -f $D/fresh*.db*`
-  // names a deliberate family of files. Guarding the latter made routine
-  // cleanup prompt, which trains you to stop reading the prompts.
-  { id: 'mass-delete', why: 'deletes whatever matches a leading wildcard', test: /\brm\s(?:[^|;&]*\s)?(?:\S*\/)?[*?]/ },
-  { id: 'root-delete', why: 'deletes a root or home path', test: /\brm\s+(?:-\S+\s+)*(?:\/|~|\$HOME)\/?\s*$/ },
   { id: 'privilege-escalation', why: 'runs as root', test: /^(sudo|doas|su)\b/ },
   { id: 'force-push', why: 'rewrites remote history', test: /\bgit\s+push\b[\s\S]*(--force(?!-with-lease)|(?:^|\s)-f(?=\s|$))/ },
   { id: 'history-rewrite', why: 'destroys local commits', test: /\bgit\s+(reset\s+--hard|clean\s+-\w*[fd]|filter-branch|rebase\s+(-i|--interactive))/ },
@@ -68,8 +61,75 @@ export const COMMAND_GUARDS = [
   },
 ]
 
+/** Deleting is judged by *what* is being deleted, so it gets its own check. */
+export const DELETE_GUARDS = [
+  { id: 'mass-delete', why: 'deletes whatever matches a leading wildcard' },
+  { id: 'root-delete', why: 'deletes a root or home path' },
+  { id: 'recursive-delete', why: 'recursive delete outside a temp or build directory' },
+]
+
 /** Every guard, for display purposes. */
-export const ALL_GUARDS = [...COMMAND_GUARDS, ...BASH_GUARDS]
+export const ALL_GUARDS = [...COMMAND_GUARDS, ...BASH_GUARDS, ...DELETE_GUARDS]
+
+/** Scratch space: a recursive delete here costs nothing. */
+const TEMP_PATH = /^(?:\/private)?\/(?:tmp|var\/folders)\//
+
+/** Regenerable build output, likewise. */
+const BUILD_PATH = /^\.{0,2}\/?(?:node_modules|dist|build|out|coverage|\.next|\.nuxt|\.turbo|\.cache|target|__pycache__)\/?$/
+
+/**
+ * `rm` is the command most worth getting right, and a blanket rule gets it
+ * wrong in both directions: guarding every `-rf` makes routine cleanup prompt
+ * until you stop reading prompts, while allowing it risks the one mistake you
+ * cannot undo. So the decision is made from the *targets*.
+ *
+ * @param {string} segment a normalized, variable-resolved command segment
+ */
+const ROOT_TARGET = /^(?:\/|~|\$HOME|\/(?:usr|etc|bin|sbin|var|opt|Users|home|System|Library|Applications))\/?$/
+
+export function checkDelete(segment) {
+  // `rm` is looked for anywhere, not just at the start: `find . -exec rm -rf
+  // {} \;` and `… | xargs rm -rf` delete just as thoroughly.
+  const invocation = /(?:^|[\s;&|(])rm(?=\s|$)/g
+
+  for (let match = invocation.exec(segment); match; match = invocation.exec(segment)) {
+    const verdict = judgeDelete(segment.slice(match.index + match[0].length))
+    if (verdict) return verdict
+  }
+  return null
+}
+
+function judgeDelete(rest) {
+  const targets = []
+  let recursive = false
+
+  for (const token of rest.split(/\s+/).filter(Boolean)) {
+    if (token.startsWith('-')) {
+      if (/^-\w*[rR]/.test(token)) recursive = true
+      continue
+    }
+    // End of this invocation: a redirect, or a `find -exec` terminator.
+    if (/^\d?[<>]/.test(token) || [';', '\\;', '+'].includes(token)) break
+    targets.push(token.replace(/^["']|["']$/g, ''))
+  }
+
+  // No targets on the line means they arrive on stdin, as in `… | xargs rm -rf`,
+  // so the set being deleted is unbounded and unreadable from here.
+  if (targets.length === 0) return recursive ? DELETE_GUARDS[2] : null
+
+  for (const target of targets) {
+    // A wildcard *filename* sweeps whatever happens to be there. A literal
+    // prefix such as `fresh*.db*` names a deliberate family of files.
+    if (/^[*?]/.test(target.slice(target.lastIndexOf('/') + 1))) return DELETE_GUARDS[0]
+    if (ROOT_TARGET.test(target)) return DELETE_GUARDS[1]
+  }
+
+  if (!recursive) return null
+
+  // An unresolved `$VAR` reaches here as literal text and matches neither
+  // pattern, so it is guarded — the right default for a path we cannot see.
+  return targets.every((t) => TEMP_PATH.test(t) || BUILD_PATH.test(t)) ? null : DELETE_GUARDS[2]
+}
 
 /**
  * Paths that must never be silently written to.
@@ -95,7 +155,7 @@ export const PROTECTED_PATH = new RegExp(
  * @param {Record<string, any>} toolInput
  * @returns {{id: string, why: string}|null} the guard that tripped, if any
  */
-export function checkGuards(toolName, toolInput = {}) {
+export function checkGuards(toolName, toolInput = {}, segments = null) {
   if (toolName === 'Bash' || toolName === 'BashOutput') {
     const command = toolInput.command
     if (typeof command !== 'string') return null
@@ -103,9 +163,12 @@ export function checkGuards(toolName, toolInput = {}) {
     const wholeLine = COMMAND_GUARDS.find((g) => g.test.test(command))
     if (wholeLine) return { id: wholeLine.id, why: wholeLine.why }
 
-    for (const segment of splitCommand(command)) {
-      const normalized = normalizeSegment(segment)
-      const hit = BASH_GUARDS.find((g) => g.test.test(normalized))
+    // decide() resolves variable assignments before splitting, so reuse its
+    // segments when given; falling back keeps this callable on its own.
+    const parts = segments ?? resolveAssignments(splitCommand(command)).map(normalizeSegment)
+
+    for (const segment of parts) {
+      const hit = BASH_GUARDS.find((g) => g.test.test(segment)) ?? checkDelete(segment)
       if (hit) return { id: hit.id, why: hit.why }
     }
     return null

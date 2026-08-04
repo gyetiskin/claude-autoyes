@@ -1,6 +1,6 @@
 import { checkGuards } from './guards.js'
 import { findAll, findAny } from './rules.js'
-import { splitCommand, normalizeSegment } from './shell.js'
+import { splitCommand, normalizeSegment, resolveAssignments } from './shell.js'
 import { detectTerminal, terminalAllowed } from './terminal.js'
 
 /**
@@ -25,11 +25,11 @@ export function decide({ toolName, toolInput = {}, config, env = process.env }) 
   // segment runs nothing, so it must not veto approval of the whole chain.
   const segments =
     toolName === 'Bash' && typeof toolInput.command === 'string'
-      ? splitCommand(toolInput.command).map(normalizeSegment).filter(Boolean)
+      ? resolveAssignments(splitCommand(toolInput.command)).map(normalizeSegment).filter(Boolean)
       : []
 
   if (!config.unsafeDisableBuiltinGuards) {
-    const guard = checkGuards(toolName, toolInput)
+    const guard = checkGuards(toolName, toolInput, segments)
     if (guard) {
       return { decision: 'ask', reason: `built-in guard "${guard.id}": ${guard.why}`, guard: guard.id }
     }

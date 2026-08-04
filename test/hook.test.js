@@ -42,7 +42,7 @@ test('emits an allow decision for an approved command', async () => {
 
 test('stays silent for a guarded command, leaving the prompt intact', async () => {
   const { stdout, code } = await runHook(
-    { tool_name: 'Bash', tool_input: { command: 'rm -rf /tmp/whatever' } },
+    { tool_name: 'Bash', tool_input: { command: 'rm -rf ~/projects' } },
     isolatedConfig(),
   )
   assert.equal(code, 0)

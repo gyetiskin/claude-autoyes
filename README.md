@@ -70,6 +70,7 @@ Before matching, each segment is reduced to the command it actually runs:
 - leading `FOO=1` assignments and `env`/`command`/`nohup`/`time`/`exec` wrappers are stripped, so `env X=1 sudo rm -rf /` cannot hide behind them;
 - shell keywords and grouping (`if`, `then`, `do`, `{`, `(`, …) are stripped. This is not cosmetic: `if sudo rm -rf /; then` produces a segment beginning with `if`, and the privilege-escalation guard is anchored at `^sudo`, so without it the guard would never fire;
 - git's global options are folded away, so `git -C /repo commit` and `git -c user.name=x commit` still meet the `Bash(git commit*)` rule instead of slipping past it;
+- variables assigned literally earlier in the same line are substituted, so `D=/private/tmp/…` followed by `rm -rf $D` is judged on the real path — which cuts both ways, since `D=/` becomes visible too;
 - `sh -c "…"` script arguments are unpacked and checked, so approving `bash *` does not become a way to run anything;
 - `$( … )` and backtick substitutions are pulled out and checked as commands in their own right. Skipping them was a guard bypass: `sudo apt-get install x` is caught, but `echo $(sudo apt-get install x)` used to be approved by the `echo` rule alone;
 - heredoc bodies are masked. `cat > f <<'EOF' … EOF` is data, not commands — otherwise a file whose contents mention `sort` would be matched as if the shell were running `sort`.
@@ -151,7 +152,7 @@ These always fall through to a prompt, whatever your rules say. Run `claude-auto
 
 `recursive-delete` · `mass-delete` · `root-delete` · `privilege-escalation` · `pipe-to-shell` · `force-push` · `history-rewrite` · `branch-delete` · `disk-write` · `permission-change` · `ownership-change` · `fork-bomb` · `system-power` · `publish` · `infra-apply` · `api-write` · `config-write` · `credential-read` · `history-clear` · `protected-path`
 
-The guards draw the line at what you cannot undo. Stopping a process you started is part of the dev loop, so `pkill`, `kill` and `killall` are approved; powering the machine down is not. The same reasoning applies to *scope* rather than command name: `rm -f build.zip` and `rm -f $D/fresh*.db*` name deliberate files and are approved, while `rm -f *.zip` and `rm -f build/*` sweep whatever happens to be there and prompt. The line is whether the *filename* starts with a wildcard. Likewise `git push` is approved but `git push --force` is guarded, and `git push --force-with-lease` is not.
+The guards draw the line at what you cannot undo. Stopping a process you started is part of the dev loop, so `pkill`, `kill` and `killall` are approved; powering the machine down is not. The same reasoning applies to *scope* rather than command name: `rm -f build.zip` and `rm -f $D/fresh*.db*` name deliberate files and are approved, while `rm -f *.zip` and `rm -f build/*` sweep whatever happens to be there and prompt. The line is whether the *filename* starts with a wildcard. `rm -rf` is judged the same way: scratch space and regenerable build output (`/tmp/…`, `node_modules`, `dist`) are approved, while any other path — including one the guard cannot resolve, and including targets arriving on stdin via `xargs` — prompts. Likewise `git push` is approved but `git push --force` is guarded, and `git push --force-with-lease` is not.
 
 Guards can be switched off with `unsafeDisableBuiltinGuards: true`. At that point you have rebuilt `--dangerously-skip-permissions` with extra steps, so please don't.
 
@@ -211,7 +212,7 @@ rm ~/.claude/autoyes.json    # optional
 ## Development
 
 ```bash
-npm test        # 57 tests, node:test, no dependencies
+npm test        # 60 tests, node:test, no dependencies
 ```
 
 `src/decide.js` is a pure function over `{ toolName, toolInput, config, env }`, so the whole policy is testable without touching the filesystem.
