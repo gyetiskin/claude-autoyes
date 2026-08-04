@@ -99,7 +99,7 @@ Detection reads `LC_TERMINAL` first, then `TERM_PROGRAM`, because iTerm2 forward
   "logPath": "~/.claude/autoyes.log",
 
   "autoApprove": ["Read", "Grep", "Bash(git status*)", "Bash(npm run *)"],
-  "alwaysAsk":   ["Bash(git push*)", "Bash(git commit*)"],
+  "alwaysAsk":   ["Bash(docker *)", "Bash(ssh *)"],
 
   "unsafeDisableBuiltinGuards": false
 }
@@ -148,9 +148,9 @@ claude-autoyes allow 'Edit(/Users/me/projects/*)'    # or scope it
 
 These always fall through to a prompt, whatever your rules say. Run `claude-autoyes guards` for the live list.
 
-`recursive-delete` · `force-delete` · `privilege-escalation` · `pipe-to-shell` · `pipe-to-interpreter` · `force-push` · `history-rewrite` · `branch-delete` · `disk-write` · `permission-change` · `ownership-change` · `fork-bomb` · `process-kill` · `system-power` · `publish` · `infra-apply` · `credential-read` · `history-clear` · `protected-path`
+`recursive-delete` · `mass-delete` · `root-delete` · `privilege-escalation` · `pipe-to-shell` · `pipe-to-interpreter` · `force-push` · `history-rewrite` · `branch-delete` · `disk-write` · `permission-change` · `ownership-change` · `fork-bomb` · `process-kill` · `system-power` · `publish` · `infra-apply` · `credential-read` · `history-clear` · `protected-path`
 
-`git push --force` is guarded; `git push --force-with-lease` is not.
+The guards draw the line at *scope*, not at the command name: `rm -f build.zip` is routine cleanup and is approved, while `rm -f *.zip` deletes an unknown number of files and prompts. Likewise `git push` is approved but `git push --force` is guarded, and `git push --force-with-lease` is not.
 
 Guards can be switched off with `unsafeDisableBuiltinGuards: true`. At that point you have rebuilt `--dangerously-skip-permissions` with extra steps, so please don't.
 
@@ -210,7 +210,7 @@ rm ~/.claude/autoyes.json    # optional
 ## Development
 
 ```bash
-npm test        # 49 tests, node:test, no dependencies
+npm test        # 52 tests, node:test, no dependencies
 ```
 
 `src/decide.js` is a pure function over `{ toolName, toolInput, config, env }`, so the whole policy is testable without touching the filesystem.

@@ -59,9 +59,23 @@ test('quoted separators do not split the command', () => {
 })
 
 test('alwaysAsk wins over autoApprove', () => {
-  const result = run('Bash', { command: 'git commit -m "wip"' }, { autoApprove: ['Bash(git commit*)'] })
+  const result = run('Bash', { command: 'docker compose up -d' }, { autoApprove: ['Bash(docker *)'] })
   assert.equal(result.decision, 'ask')
   assert.match(result.reason, /alwaysAsk/)
+})
+
+test('a targeted delete is routine but a wildcard delete is not', () => {
+  assert.equal(run('Bash', { command: 'rm -f /tmp/build.zip' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'rm -f "$ARCHIVE"' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'rm -f *.zip' }).guard, 'mass-delete')
+  assert.equal(run('Bash', { command: 'rm -f build/*' }).guard, 'mass-delete')
+  assert.equal(run('Bash', { command: 'rm -rf /tmp/dir' }).guard, 'recursive-delete')
+  assert.equal(run('Bash', { command: 'rm -f ~' }).guard, 'root-delete')
+})
+
+test('pushing is routine but rewriting remote history is not', () => {
+  assert.equal(run('Bash', { command: 'git push -q origin HEAD' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'git push --force origin main' }).guard, 'force-push')
 })
 
 test('non-iTerm2 terminals never auto-approve', () => {
@@ -136,17 +150,23 @@ test('quoted text that only looks destructive errs toward prompting', () => {
   assert.equal(run('Bash', { command: "echo 'literal $(sudo rm -rf /)'" }).decision, 'ask')
 })
 
-test('git global options cannot smuggle a subcommand past alwaysAsk', () => {
+test('git global options cannot smuggle a subcommand past a guard', () => {
   for (const command of [
-    'git -C /repo commit -m x',
-    'git -c user.name=bot commit -m x',
-    'git --git-dir=/r/.git commit -m x',
-    'git -C /repo -c user.email=a@b commit -m x',
+    'git -C /repo push --force origin main',
+    'git -c user.name=bot push --force origin main',
+    'git --git-dir=/r/.git push --force origin main',
+    'git -C /repo -c user.email=a@b push --force origin main',
   ]) {
     const result = run('Bash', { command })
     assert.equal(result.decision, 'ask', command)
-    assert.match(result.reason, /alwaysAsk/, command)
+    assert.equal(result.guard, 'force-push', command)
   }
+})
+
+test('git global options cannot smuggle a subcommand past alwaysAsk', () => {
+  const result = run('Bash', { command: 'git -C /repo commit -m x' }, { alwaysAsk: ['Bash(git commit*)'] })
+  assert.equal(result.decision, 'ask')
+  assert.match(result.reason, /alwaysAsk/)
 })
 
 test('git global options still resolve to an approved subcommand', () => {

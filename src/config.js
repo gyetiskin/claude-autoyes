@@ -99,6 +99,9 @@ export const DEFAULT_CONFIG = {
     'Bash(git describe*)',
     'Bash(git config --get*)',
     'Bash(git add *)',
+    'Bash(git commit*)',
+    'Bash(git push*)',
+    'Bash(git tag*)',
     'Bash(git fetch*)',
     'Bash(git pull*)',
 
@@ -139,6 +142,10 @@ export const DEFAULT_CONFIG = {
     'Bash(tsc *)',
     'Bash(mkdir -p *)',
     'Bash(touch *)',
+    'Bash(rm *)',
+    'Bash(zip *)',
+    'Bash(unzip *)',
+    'Bash(tar *)',
     'Bash(cp *)',
     'Bash(sed *)',
 
@@ -153,8 +160,6 @@ export const DEFAULT_CONFIG = {
 
   // Matched before autoApprove: these always fall through to the normal prompt.
   alwaysAsk: [
-    'Bash(git commit*)',
-    'Bash(git push*)',
     'Bash(gh pr *)',
     'Bash(gh release *)',
     'Bash(gh repo delete*)',

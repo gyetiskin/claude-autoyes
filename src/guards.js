@@ -17,7 +17,11 @@ import { splitCommand, normalizeSegment } from './shell.js'
  */
 export const BASH_GUARDS = [
   { id: 'recursive-delete', why: 'recursive delete', test: /\brm\s+(-\w*[rR]\w*\s+)*-\w*[rR]/ },
-  { id: 'force-delete', why: 'forced delete', test: /\brm\s+(-\w*f\w*\s+)*-\w*f/ },
+  // `rm -f build.zip` is routine cleanup; `rm -f *.zip` is not. Guarding every
+  // -f made deploy scripts prompt constantly, which trains you to stop reading
+  // the prompts. Guard the shape that deletes an unknown number of files.
+  { id: 'mass-delete', why: 'deletes a wildcard set of files', test: /\brm\s(?:[^|;&]*\s)?-?\S*[*?]/ },
+  { id: 'root-delete', why: 'deletes a root or home path', test: /\brm\s+(?:-\S+\s+)*(?:\/|~|\$HOME)\/?\s*$/ },
   { id: 'privilege-escalation', why: 'runs as root', test: /^(sudo|doas|su)\b/ },
   { id: 'force-push', why: 'rewrites remote history', test: /\bgit\s+push\b[\s\S]*(--force(?!-with-lease)|(?:^|\s)-f(?=\s|$))/ },
   { id: 'history-rewrite', why: 'destroys local commits', test: /\bgit\s+(reset\s+--hard|clean\s+-\w*[fd]|filter-branch|rebase\s+(-i|--interactive))/ },
