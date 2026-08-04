@@ -69,6 +69,10 @@ test('a targeted delete is routine but a wildcard delete is not', () => {
   assert.equal(run('Bash', { command: 'rm -f "$ARCHIVE"' }).decision, 'allow')
   assert.equal(run('Bash', { command: 'rm -f *.zip' }).guard, 'mass-delete')
   assert.equal(run('Bash', { command: 'rm -f build/*' }).guard, 'mass-delete')
+  assert.equal(run('Bash', { command: 'rm -f *' }).guard, 'mass-delete')
+  // A literal prefix names a deliberate family of files, not a sweep.
+  assert.equal(run('Bash', { command: 'rm -f $D/fresh*.db*' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'rm -f /tmp/build-*.log' }).decision, 'allow')
   assert.equal(run('Bash', { command: 'rm -rf /tmp/dir' }).guard, 'recursive-delete')
   assert.equal(run('Bash', { command: 'rm -f ~' }).guard, 'root-delete')
 })
@@ -235,4 +239,11 @@ test('stopping a process is recoverable and not guarded', () => {
   assert.equal(run('Bash', { command: 'killall node' }).decision, 'allow')
   // Powering the machine down is not.
   assert.equal(run('Bash', { command: 'sudo shutdown -h now' }, { mode: 'aggressive' }).decision, 'ask')
+})
+
+test('reading pull requests is routine but changing them is not', () => {
+  assert.equal(run('Bash', { command: 'gh pr list -R o/r --limit 5' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'gh pr view 12' }).decision, 'allow')
+  assert.match(run('Bash', { command: 'gh pr merge 12 --squash' }).reason, /alwaysAsk/)
+  assert.match(run('Bash', { command: 'gh pr create --title x' }).reason, /alwaysAsk/)
 })

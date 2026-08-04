@@ -2,6 +2,12 @@
 
 Every entry below came from watching the audit log of real sessions rather than from reasoning about what might go wrong. The pattern repeated: a rule that looked safe on paper approved something it should not have, or prompted on something routine until the prompts stopped being read.
 
+## 0.10.0
+
+- Draw `mass-delete` at the right place. It fired on `rm -f $D/fresh*.db*`, which names a deliberate family of files; the shape that actually sweeps whatever is present is a *filename* starting with a wildcard — `rm -f *.zip`, `rm -f build/*`, `rm -f *`. Those still prompt.
+- `Bash(gh pr *)` in alwaysAsk also caught `gh pr list`, `view` and `diff`, which are reads. Narrowed to the mutating subcommands.
+- Replaying 389 logged decisions: 93% now auto-approved.
+
 ## 0.9.0
 
 - Drop the `process-kill` guard. Stopping a dev server you just started is part of the loop and is recoverable — you restart it — so it does not belong beside `rm -rf` and `git push --force`. `kill`, `pkill`, `killall`, `lsof` and `ps` are approved; `shutdown`/`reboot` still are not.

@@ -17,10 +17,11 @@ import { splitCommand, normalizeSegment } from './shell.js'
  */
 export const BASH_GUARDS = [
   { id: 'recursive-delete', why: 'recursive delete', test: /\brm\s+(-\w*[rR]\w*\s+)*-\w*[rR]/ },
-  // `rm -f build.zip` is routine cleanup; `rm -f *.zip` is not. Guarding every
-  // -f made deploy scripts prompt constantly, which trains you to stop reading
-  // the prompts. Guard the shape that deletes an unknown number of files.
-  { id: 'mass-delete', why: 'deletes a wildcard set of files', test: /\brm\s(?:[^|;&]*\s)?-?\S*[*?]/ },
+  // The line is whether the *filename* starts with a wildcard. `rm -f *.zip`
+  // and `rm -f build/*` sweep whatever happens to be there; `rm -f $D/fresh*.db*`
+  // names a deliberate family of files. Guarding the latter made routine
+  // cleanup prompt, which trains you to stop reading the prompts.
+  { id: 'mass-delete', why: 'deletes whatever matches a leading wildcard', test: /\brm\s(?:[^|;&]*\s)?(?:\S*\/)?[*?]/ },
   { id: 'root-delete', why: 'deletes a root or home path', test: /\brm\s+(?:-\S+\s+)*(?:\/|~|\$HOME)\/?\s*$/ },
   { id: 'privilege-escalation', why: 'runs as root', test: /^(sudo|doas|su)\b/ },
   { id: 'force-push', why: 'rewrites remote history', test: /\bgit\s+push\b[\s\S]*(--force(?!-with-lease)|(?:^|\s)-f(?=\s|$))/ },

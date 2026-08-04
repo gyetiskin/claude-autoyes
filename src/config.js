@@ -192,7 +192,16 @@ export const DEFAULT_CONFIG = {
 
   // Matched before autoApprove: these always fall through to the normal prompt.
   alwaysAsk: [
-    'Bash(gh pr *)',
+    // Only the mutating subcommands: `gh pr *` also caught list/view/diff,
+    // which are reads and are approved above.
+    'Bash(gh pr create*)',
+    'Bash(gh pr merge*)',
+    'Bash(gh pr close*)',
+    'Bash(gh pr reopen*)',
+    'Bash(gh pr edit*)',
+    'Bash(gh pr review*)',
+    'Bash(gh pr ready*)',
+    'Bash(gh pr comment*)',
     'Bash(gh release *)',
     'Bash(gh repo delete*)',
     'Bash(docker *)',

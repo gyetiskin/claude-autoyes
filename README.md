@@ -151,7 +151,7 @@ These always fall through to a prompt, whatever your rules say. Run `claude-auto
 
 `recursive-delete` · `mass-delete` · `root-delete` · `privilege-escalation` · `pipe-to-shell` · `force-push` · `history-rewrite` · `branch-delete` · `disk-write` · `permission-change` · `ownership-change` · `fork-bomb` · `system-power` · `publish` · `infra-apply` · `api-write` · `config-write` · `credential-read` · `history-clear` · `protected-path`
 
-The guards draw the line at what you cannot undo. Stopping a process you started is part of the dev loop, so `pkill`, `kill` and `killall` are approved; powering the machine down is not. The same reasoning applies to *scope* rather than command name: `rm -f build.zip` is routine cleanup and is approved, while `rm -f *.zip` deletes an unknown number of files and prompts. Likewise `git push` is approved but `git push --force` is guarded, and `git push --force-with-lease` is not.
+The guards draw the line at what you cannot undo. Stopping a process you started is part of the dev loop, so `pkill`, `kill` and `killall` are approved; powering the machine down is not. The same reasoning applies to *scope* rather than command name: `rm -f build.zip` and `rm -f $D/fresh*.db*` name deliberate files and are approved, while `rm -f *.zip` and `rm -f build/*` sweep whatever happens to be there and prompt. The line is whether the *filename* starts with a wildcard. Likewise `git push` is approved but `git push --force` is guarded, and `git push --force-with-lease` is not.
 
 Guards can be switched off with `unsafeDisableBuiltinGuards: true`. At that point you have rebuilt `--dangerously-skip-permissions` with extra steps, so please don't.
 
@@ -211,7 +211,7 @@ rm ~/.claude/autoyes.json    # optional
 ## Development
 
 ```bash
-npm test        # 56 tests, node:test, no dependencies
+npm test        # 57 tests, node:test, no dependencies
 ```
 
 `src/decide.js` is a pure function over `{ toolName, toolInput, config, env }`, so the whole policy is testable without touching the filesystem.
