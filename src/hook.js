@@ -55,7 +55,7 @@ export async function main() {
       at: new Date().toISOString(),
       session: payload?.session_id ?? null,
       tool: toolName,
-      subject: subjectOf(toolName, payload?.tool_input ?? {}).slice(0, 400),
+      subject: subjectOf(toolName, payload?.tool_input ?? {}).slice(0, 1000),
       decision: result.decision,
       reason: result.reason,
     })

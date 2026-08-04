@@ -21,9 +21,11 @@ export function decide({ toolName, toolInput = {}, config, env = process.env }) 
     return { decision: 'ask', reason: `terminal "${current}" is not in terminals: [${config.terminals.join(', ')}]` }
   }
 
+  // Normalizing can empty a segment (a bare `FOO=bar`, a stray `fi`). An empty
+  // segment runs nothing, so it must not veto approval of the whole chain.
   const segments =
     toolName === 'Bash' && typeof toolInput.command === 'string'
-      ? splitCommand(toolInput.command).map(normalizeSegment)
+      ? splitCommand(toolInput.command).map(normalizeSegment).filter(Boolean)
       : []
 
   if (!config.unsafeDisableBuiltinGuards) {

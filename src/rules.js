@@ -63,6 +63,15 @@ export function matchSubject(rule, toolName, subject) {
   if (!parsed) return false
   if (parsed.tool !== toolName && parsed.tool !== '*') return false
   if (parsed.pattern === null) return true
+
+  // A trailing " *" means "arguments", and arguments are optional: `sort *`
+  // should cover the bare `sort` in `… | sort | uniq -c`. Matching the bare
+  // form explicitly — rather than writing the rule as `sort*` — keeps `ls *`
+  // from also matching `lsof`.
+  if (parsed.pattern.endsWith(' *') && subject.trim() === parsed.pattern.slice(0, -2)) {
+    return true
+  }
+
   return globToRegExp(parsed.pattern).test(subject)
 }
 

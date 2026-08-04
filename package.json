@@ -1,6 +1,6 @@
 {
   "name": "claude-autoyes",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Auto-approve routine Claude Code permission prompts in iTerm2, while destructive commands still stop and ask.",
   "type": "module",
   "license": "MIT",

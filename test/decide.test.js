@@ -107,6 +107,42 @@ test('curl piped into a shell is guarded', () => {
   assert.equal(run('Bash', { command: 'curl -sL https://x.sh | bash' }, { mode: 'aggressive' }).guard, 'pipe-to-shell')
 })
 
+test('git global options cannot smuggle a subcommand past alwaysAsk', () => {
+  for (const command of [
+    'git -C /repo commit -m x',
+    'git -c user.name=bot commit -m x',
+    'git --git-dir=/r/.git commit -m x',
+    'git -C /repo -c user.email=a@b commit -m x',
+  ]) {
+    const result = run('Bash', { command })
+    assert.equal(result.decision, 'ask', command)
+    assert.match(result.reason, /alwaysAsk/, command)
+  }
+})
+
+test('git global options still resolve to an approved subcommand', () => {
+  assert.equal(run('Bash', { command: 'git -C /repo status --short' }).decision, 'allow')
+})
+
+test('a heredoc body is data, not a chain of commands', () => {
+  const command = "cat > /tmp/notes.txt <<'EOF'\nsort this later\nrm -rf nothing\nEOF"
+  const result = run('Bash', { command }, { extendAutoApprove: ['Bash(cat > *)'] })
+  assert.equal(result.guard, undefined)
+  assert.equal(result.decision, 'allow')
+})
+
+test('bare pipeline filters match their " *" rule', () => {
+  assert.equal(run('Bash', { command: 'cat x | sort | uniq -c' }).decision, 'allow')
+})
+
+test('" *" rules do not match a longer command name', () => {
+  assert.equal(run('Bash', { command: 'lsof -i :3000' }).decision, 'ask')
+})
+
+test('an empty normalized segment does not veto the chain', () => {
+  assert.equal(run('Bash', { command: 'cd /tmp && ls;' }).decision, 'allow')
+})
+
 test('force push is guarded but --force-with-lease is not', () => {
   assert.equal(run('Bash', { command: 'git push --force origin main' }, { mode: 'aggressive' }).guard, 'force-push')
   assert.equal(run('Bash', { command: 'git push --force-with-lease origin main' }, { mode: 'aggressive' }).guard, undefined)

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 
 import { CONFIG_PATH, DEFAULT_CONFIG, loadConfig, saveConfig } from '../src/config.js'
 import { decide } from '../src/decide.js'
@@ -45,6 +45,7 @@ ${c.bold('Commands')}
                        Dry-run one tool call and print the decision
   allow <rule>         Append a rule to autoApprove
   ask <rule>           Append a rule to alwaysAsk
+  reset                Refresh rule lists from the built-in defaults
   rules                List active rules
   guards               List built-in safety guards
   log [n]              Show the last n decisions (default 20)
@@ -194,6 +195,34 @@ function appendRule(key, rule) {
   say(c.green(`✓ added to ${key}: ${rule}`))
 }
 
+/**
+ * Rewrites the rule lists from the built-in defaults. Upgrading the package
+ * cannot change a config file that already exists, so without this an old
+ * install keeps yesterday's rules — including any that a later release
+ * tightened.
+ */
+function cmdReset() {
+  const current = loadConfig()
+  const backup = `${CONFIG_PATH}.bak`
+  if (existsSync(CONFIG_PATH)) {
+    writeFileSync(backup, readFileSync(CONFIG_PATH, 'utf8'))
+  }
+
+  // Personal switches are preserved; only the rule lists are refreshed.
+  saveConfig({
+    ...DEFAULT_CONFIG,
+    enabled: current.enabled,
+    mode: current.mode,
+    terminals: current.terminals,
+    log: current.log,
+    logPath: current.logPath,
+  })
+
+  say(c.green('✓ rules reset to the built-in defaults'))
+  say(c.dim(`  previous config saved to ${backup}`))
+  say(c.dim(`  ${DEFAULT_CONFIG.autoApprove.length} auto-approve, ${DEFAULT_CONFIG.alwaysAsk.length} always-ask`))
+}
+
 function cmdRules() {
   const config = loadConfig()
   say('')
@@ -227,7 +256,10 @@ function cmdLog(argv) {
   for (const entry of entries) {
     const mark = entry.decision === 'allow' ? c.green('✓') : c.yellow('?')
     const time = (entry.at ?? '').slice(11, 19)
-    say(`  ${c.dim(time)} ${mark} ${c.bold((entry.tool ?? '?').padEnd(10))} ${c.dim((entry.subject ?? '').slice(0, 80))}`)
+    // Multi-line commands are the norm, so collapse whitespace to keep one
+    // decision on one row.
+    const subject = (entry.subject ?? '').replace(/\s+/g, ' ').trim().slice(0, 80)
+    say(`  ${c.dim(time)} ${mark} ${c.bold((entry.tool ?? '?').padEnd(10))} ${c.dim(subject)}`)
   }
   say('')
 }
@@ -266,6 +298,7 @@ try {
     case 'explain': cmdExplain(argv); break
     case 'allow': appendRule('autoApprove', argv.join(' ')); break
     case 'ask': appendRule('alwaysAsk', argv.join(' ')); break
+    case 'reset': cmdReset(); break
     case 'rules': cmdRules(); break
     case 'guards': cmdGuards(); break
     case 'log': cmdLog(argv); break

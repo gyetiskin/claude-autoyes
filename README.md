@@ -65,7 +65,12 @@ A rule like `Bash(git status*)` would otherwise approve `git status && rm -rf ~`
 - **approving requires *every* segment to match a rule** — different segments may match different rules, so `git add . && git status` is fine;
 - **asking requires only *one* segment to match** a guard or an `alwaysAsk` rule.
 
-Leading `FOO=1` assignments and `env`/`command`/`nohup`/`time`/`exec` wrappers are stripped before matching, so `env X=1 sudo rm -rf /` cannot hide behind them.
+Before matching, each segment is reduced to the command it actually runs:
+
+- leading `FOO=1` assignments and `env`/`command`/`nohup`/`time`/`exec` wrappers are stripped, so `env X=1 sudo rm -rf /` cannot hide behind them;
+- shell keywords and grouping (`if`, `then`, `do`, `{`, `(`, …) are stripped. This is not cosmetic: `if sudo rm -rf /; then` produces a segment beginning with `if`, and the privilege-escalation guard is anchored at `^sudo`, so without it the guard would never fire;
+- git's global options are folded away, so `git -C /repo commit` and `git -c user.name=x commit` still meet the `Bash(git commit*)` rule instead of slipping past it;
+- heredoc bodies are masked. `cat > f <<'EOF' … EOF` is data, not commands — otherwise a file whose contents mention `sort` would be matched as if the shell were running `sort`.
 
 ## Why iTerm2?
 
@@ -115,6 +120,16 @@ Identical to Claude Code's own permission rules:
 
 `*` matches any run of characters, `?` matches one, everything else is literal.
 
+A trailing `" *"` means "arguments", and arguments are optional: `Bash(sort *)` covers both `sort -u file` and the bare `sort` in `… | sort | uniq -c`. Write rules this way rather than as `Bash(sort*)` — the latter would also match `sortfoo`, which is how an `ls*` rule ends up approving `lsof`.
+
+### File edits are not auto-approved
+
+`Edit`, `Write` and `NotebookEdit` are deliberately absent from the defaults: changing your files is the one thing worth glancing at. Claude Code's own `acceptEdits` mode already covers that case. If you still want it, scope it to a directory rather than turning it on globally:
+
+```bash
+claude-autoyes allow 'Edit(/Users/me/projects/scratch/*)'
+```
+
 ### Modes
 
 | Mode | Unmatched call |
@@ -148,6 +163,7 @@ claude-autoyes explain <tool> [subject]
                                   Dry-run one call and print the decision
 claude-autoyes allow '<rule>'     Append to autoApprove
 claude-autoyes ask '<rule>'       Append to alwaysAsk
+claude-autoyes reset              Refresh rule lists from the built-in defaults
 claude-autoyes rules              List active rules
 claude-autoyes guards             List built-in guards
 claude-autoyes log [n]            Last n decisions
@@ -155,6 +171,8 @@ claude-autoyes config             Print the resolved config
 ```
 
 `explain` runs the exact code path the hook runs, so it is the fastest way to test a rule before trusting it.
+
+Upgrading the package does not touch an existing `~/.claude/autoyes.json`, so a new release's rules are not picked up automatically. Run `claude-autoyes reset` after upgrading to refresh the rule lists (your mode, terminals and log settings are kept, and the old file is saved as `autoyes.json.bak`).
 
 ## Audit log
 
@@ -188,7 +206,7 @@ rm ~/.claude/autoyes.json    # optional
 ## Development
 
 ```bash
-npm test        # 37 tests, node:test, no dependencies
+npm test        # 43 tests, node:test, no dependencies
 ```
 
 `src/decide.js` is a pure function over `{ toolName, toolInput, config, env }`, so the whole policy is testable without touching the filesystem.
