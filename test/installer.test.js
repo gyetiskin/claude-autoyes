@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { addHook, isInstalled, removeHook, resolveNodePath } from '../src/installer.js'
-import { splitCommand, normalizeSegment } from '../src/shell.js'
+import { splitCommand, normalizeSegment, maskSubstitutions } from '../src/shell.js'
 import { globToRegExp, matchRule, parseRule } from '../src/rules.js'
 
 const COMMAND = '"/usr/bin/node" "/opt/claude-autoyes/src/hook.js"'
@@ -69,6 +69,20 @@ test('splitCommand respects quotes and escapes', () => {
   assert.deepEqual(splitCommand('echo "x && y"'), ['echo "x && y"'])
   assert.deepEqual(splitCommand("echo 'x; y' ; ls"), ["echo 'x; y'", 'ls'])
   assert.deepEqual(splitCommand('cat a | grep b'), ['cat a', 'grep b'])
+})
+
+test('maskSubstitutions extracts commands but leaves single-quoted text alone', () => {
+  assert.deepEqual(maskSubstitutions('echo $(date)').inners, ['date'])
+  assert.deepEqual(maskSubstitutions('echo `date`').inners, ['date'])
+  assert.deepEqual(maskSubstitutions('echo "now: $(date)"').inners, ['date'])
+  assert.deepEqual(maskSubstitutions("echo 'literal $(date)'").inners, [])
+  assert.deepEqual(maskSubstitutions('echo $((1 + 2))').inners, [])
+  assert.deepEqual(maskSubstitutions('a=$(b $(c))').inners, ['b $(c)'])
+})
+
+test('an unterminated substitution does not hang or throw', () => {
+  assert.doesNotThrow(() => splitCommand('echo $(date'))
+  assert.doesNotThrow(() => splitCommand('echo `date'))
 })
 
 test('normalizeSegment strips assignments and wrappers', () => {
