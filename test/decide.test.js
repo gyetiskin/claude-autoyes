@@ -202,8 +202,13 @@ test('bare pipeline filters match their " *" rule', () => {
   assert.equal(run('Bash', { command: 'cat x | sort | uniq -c' }).decision, 'allow')
 })
 
-test('" *" rules do not match a longer command name', () => {
-  assert.equal(run('Bash', { command: 'lsof -i :3000' }).decision, 'ask')
+test('" *" rules cover the bare command but not a longer command name', () => {
+  // Pinned to a single rule so the assertion tests the matcher, not whichever
+  // commands happen to be in the default list.
+  const only = { autoApprove: ['Bash(ls *)'] }
+  assert.equal(run('Bash', { command: 'ls -la' }, only).decision, 'allow')
+  assert.equal(run('Bash', { command: 'ls' }, only).decision, 'allow')
+  assert.equal(run('Bash', { command: 'lsof -i :3000' }, only).decision, 'ask')
 })
 
 test('an empty normalized segment does not veto the chain', () => {
@@ -222,4 +227,12 @@ test('reading git config is routine but writing it is guarded', () => {
   assert.equal(run('Bash', { command: 'git config --local user.email a@b.c' }).guard, 'config-write')
   assert.equal(run('Bash', { command: 'git config --global --unset user.name' }).guard, 'config-write')
   assert.equal(run('Bash', { command: 'git config core.hooksPath /tmp/evil' }).guard, 'config-write')
+})
+
+test('stopping a process is recoverable and not guarded', () => {
+  assert.equal(run('Bash', { command: 'pkill -f "PORT=5179"' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'kill -9 12345' }).decision, 'allow')
+  assert.equal(run('Bash', { command: 'killall node' }).decision, 'allow')
+  // Powering the machine down is not.
+  assert.equal(run('Bash', { command: 'sudo shutdown -h now' }, { mode: 'aggressive' }).decision, 'ask')
 })

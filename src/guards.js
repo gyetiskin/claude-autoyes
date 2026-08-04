@@ -30,7 +30,6 @@ export const BASH_GUARDS = [
   { id: 'permission-change', why: 'weakens file permissions', test: /\bchmod\s+(-\w+\s+)*(777|a\+w|o\+w)/ },
   { id: 'ownership-change', why: 'changes file ownership', test: /\bchown\b/ },
   { id: 'fork-bomb', why: 'fork bomb', test: /:\(\)\s*\{.*\|.*&.*\}/ },
-  { id: 'process-kill', why: 'kills processes broadly', test: /\b(killall|pkill)\b|\bkill\s+-9\b/ },
   { id: 'system-power', why: 'shuts the machine down', test: /\b(shutdown|reboot|halt)\b/ },
   { id: 'publish', why: 'publishes a release publicly', test: /\b(npm|pnpm|yarn)\s+publish\b|\btwine\s+upload\b|\bcargo\s+publish\b|\bgem\s+push\b/ },
   { id: 'infra-apply', why: 'mutates live infrastructure', test: /\b(terraform\s+(apply|destroy)|kubectl\s+delete|helm\s+(delete|uninstall)|aws\s+\S+\s+delete)/ },

@@ -2,6 +2,10 @@
 
 Every entry below came from watching the audit log of real sessions rather than from reasoning about what might go wrong. The pattern repeated: a rule that looked safe on paper approved something it should not have, or prompted on something routine until the prompts stopped being read.
 
+## 0.9.0
+
+- Drop the `process-kill` guard. Stopping a dev server you just started is part of the loop and is recoverable — you restart it — so it does not belong beside `rm -rf` and `git push --force`. `kill`, `pkill`, `killall`, `lsof` and `ps` are approved; `shutdown`/`reboot` still are not.
+
 ## 0.8.0
 
 - Guard the pipe that feeds a *program*, not the one that feeds *data*. `curl … | python3 -c '…'` was treated as running downloaded code; it is not, since the program is written out in the command and the pipe carries only the response body. The guard now fires only when the interpreter takes no `-c` and so reads its program from the pipe: `curl … | sh`, `curl … | python3`.
